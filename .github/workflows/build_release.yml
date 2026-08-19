@@ -3,16 +3,43 @@ name: Build & Release Mesh Messenger App
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  version-info:
+    name: Extract Version Information
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.extract_version.outputs.app_version }}
+      build_number: ${{ steps.extract_version.outputs.build_number }}
+      version_tag: ${{ steps.extract_version.outputs.version_tag }}
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Extract Version from pubspec.yaml
+        id: extract_version
+        run: |
+          VERSION_LINE=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          VERSION_NAME=$(echo $VERSION_LINE | cut -d'+' -f1)
+          BUILD_NUM=${{ github.run_number }}
+          TAG_NAME="v${VERSION_NAME}-build.${BUILD_NUM}"
+          
+          echo "app_version=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "build_number=${BUILD_NUM}" >> $GITHUB_OUTPUT
+          echo "version_tag=${TAG_NAME}" >> $GITHUB_OUTPUT
+          
+          echo "Extracted Version: ${VERSION_NAME}"
+          echo "Build Number: ${BUILD_NUM}"
+          echo "Version Tag: ${TAG_NAME}"
+
   test-and-build-android:
-    name: Build Android APK & Test
+    name: Build Android APK
+    needs: version-info
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Codebase
@@ -38,21 +65,22 @@ jobs:
         run: flutter test
 
       - name: Build Release APK
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --build-number=${{ needs.version-info.outputs.build_number }} --build-name=${{ needs.version-info.outputs.app_version }}
 
-      - name: Rename APK for Release
+      - name: Prepare APK Output
         run: |
           mkdir -p build/release_out
-          cp build/app/outputs/flutter-apk/app-release.apk build/release_out/MeshMessenger-v1.0.0-Android.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/release_out/MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Android.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MeshMessenger-v1.0.0-Android
-          path: build/release_out/MeshMessenger-v1.0.0-Android.apk
+          name: MeshMessenger-Android-APK
+          path: build/release_out/MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Android.apk
 
   build-ios-web:
     name: Build Web & iOS Bundle
+    needs: version-info
     runs-on: macos-latest
     steps:
       - name: Checkout Codebase
@@ -68,26 +96,25 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Build Web App Bundle
+      - name: Build Web App Release
         run: |
-          flutter build web --release
-          cd build/web && zip -r ../../MeshMessenger-Web.zip . && cd ../..
+          flutter build web --release --build-number=${{ needs.version-info.outputs.build_number }} --build-name=${{ needs.version-info.outputs.app_version }}
+          cd build/web && zip -r ../../MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Web.zip . && cd ../..
 
       - name: Build iOS App Payload (No Codesign)
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --build-number=${{ needs.version-info.outputs.build_number }} --build-name=${{ needs.version-info.outputs.app_version }}
 
       - name: Upload Web Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MeshMessenger-Web
-          path: MeshMessenger-Web.zip
+          name: MeshMessenger-Web-Bundle
+          path: MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Web.zip
 
   create-github-release:
-    name: Create GitHub Release & Publish Apps
-    needs: [test-and-build-android, build-ios-web]
+    name: Publish Versioned GitHub Release
+    needs: [version-info, test-and-build-android, build-ios-web]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout Codebase
         uses: actions/checkout@v4
@@ -95,33 +122,35 @@ jobs:
       - name: Download Android Artifact
         uses: actions/download-artifact@v4
         with:
-          name: MeshMessenger-v1.0.0-Android
+          name: MeshMessenger-Android-APK
 
       - name: Download Web Artifact
         uses: actions/download-artifact@v4
         with:
-          name: MeshMessenger-Web
+          name: MeshMessenger-Web-Bundle
 
-      - name: Create Automated Release
+      - name: Publish Versioned GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v1.0.0-${{ github.run_number }}
-          name: "Mesh Messenger v1.0.0 Release (Build #${{ github.run_number }})"
+          tag_name: ${{ needs.version-info.outputs.version_tag }}
+          name: "Mesh Messenger v${{ needs.version-info.outputs.app_version }} (Build #${{ needs.version-info.outputs.build_number }})"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
           body: |
-            ## Resilient Mesh Messenger — Multi-Transport DTN Architecture
+            ## Mesh Messenger Release — v${{ needs.version-info.outputs.app_version }} (Build #${{ needs.version-info.outputs.build_number }})
 
-            ### Ready-to-Install Builds:
-            - **Android APK**: Download `MeshMessenger-v1.0.0-Android.apk` below and install directly on Android devices.
-            - **Web & iOS Web App**: Download `MeshMessenger-Web.zip` or deploy to hosting.
+            ### Download & Install Apps:
+            - **Android APK**: `MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Android.apk` (Download and open on Android to install directly).
+            - **Web App**: `MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Web.zip`
 
-            ### Included Features:
-            - **DTN Bundle Format (RFC 9171 / BPv7)** with SHA-256 deduplication and TTL decay.
-            - **Ed25519 Cryptographic Signatures** and **ChaCha20-Poly1305 E2E Encryption**.
+            ### Architecture Features Included:
+            - **DTN Bundle Architecture (RFC 9171 / BPv7)** with SHA-256 deduplication and TTL decay.
+            - **Ed25519 Keypairs** and **ChaCha20-Poly1305 Payload E2E Encryption**.
             - **Multi-Transport Support**: BLE Mesh, Nostr Internet Gateway (`wss://relay.damus.io`), Sneakernet QR / File.
-            - **Interactive Visual Mesh Simulator**: Live multi-node graph topology and store-and-forward hop testing.
-            - **PRoPHET Delivery Predictability Routing** & Emergency Priority Queueing.
+            - **Interactive Visual Mesh Simulator**: Real-time topology testing.
           files: |
-            MeshMessenger-v1.0.0-Android.apk
-            MeshMessenger-Web.zip
+            MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Android.apk
+            MeshMessenger-${{ needs.version-info.outputs.version_tag }}-Web.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
