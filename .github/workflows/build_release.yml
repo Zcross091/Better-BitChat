@@ -1,0 +1,127 @@
+name: Build & Release Mesh Messenger App
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-build-android:
+    name: Build Android APK & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Run Unit & Protocol Tests
+        run: flutter test
+
+      - name: Build Release APK
+        run: flutter build apk --release --split-per-abi
+
+      - name: Rename APK for Release
+        run: |
+          mkdir -p build/release_out
+          cp build/app/outputs/flutter-apk/app-release.apk build/release_out/MeshMessenger-v1.0.0-Android.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeshMessenger-v1.0.0-Android
+          path: build/release_out/MeshMessenger-v1.0.0-Android.apk
+
+  build-ios-web:
+    name: Build Web & iOS Bundle
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Web App Bundle
+        run: |
+          flutter build web --release
+          cd build/web && zip -r ../../MeshMessenger-Web.zip . && cd ../..
+
+      - name: Build iOS App Payload (No Codesign)
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeshMessenger-Web
+          path: MeshMessenger-Web.zip
+
+  create-github-release:
+    name: Create GitHub Release & Publish Apps
+    needs: [test-and-build-android, build-ios-web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MeshMessenger-v1.0.0-Android
+
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MeshMessenger-Web
+
+      - name: Create Automated Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: "Mesh Messenger v1.0.0 Release (Build #${{ github.run_number }})"
+          body: |
+            ## Resilient Mesh Messenger — Multi-Transport DTN Architecture
+
+            ### Ready-to-Install Builds:
+            - **Android APK**: Download `MeshMessenger-v1.0.0-Android.apk` below and install directly on Android devices.
+            - **Web & iOS Web App**: Download `MeshMessenger-Web.zip` or deploy to hosting.
+
+            ### Included Features:
+            - **DTN Bundle Format (RFC 9171 / BPv7)** with SHA-256 deduplication and TTL decay.
+            - **Ed25519 Cryptographic Signatures** and **ChaCha20-Poly1305 E2E Encryption**.
+            - **Multi-Transport Support**: BLE Mesh, Nostr Internet Gateway (`wss://relay.damus.io`), Sneakernet QR / File.
+            - **Interactive Visual Mesh Simulator**: Live multi-node graph topology and store-and-forward hop testing.
+            - **PRoPHET Delivery Predictability Routing** & Emergency Priority Queueing.
+          files: |
+            MeshMessenger-v1.0.0-Android.apk
+            MeshMessenger-Web.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
