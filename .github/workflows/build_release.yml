@@ -59,7 +59,7 @@ jobs:
           cache: true
 
       - name: Initialize Native Platform Wrappers
-        run: flutter create . --platforms=android,ios,web --org=com.mesh.messenger
+        run: flutter create . --project-name=mesh_messenger --platforms=android,ios,web --org=com.mesh.messenger
 
       - name: Get Dependencies
         run: flutter pub get
@@ -97,7 +97,7 @@ jobs:
           cache: true
 
       - name: Initialize Native Platform Wrappers
-        run: flutter create . --platforms=android,ios,web --org=com.mesh.messenger
+        run: flutter create . --project-name=mesh_messenger --platforms=android,ios,web --org=com.mesh.messenger
 
       - name: Get Dependencies
         run: flutter pub get
