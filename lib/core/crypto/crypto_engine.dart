@@ -14,7 +14,7 @@ class CryptoKeyPair {
 class CryptoEngine {
   static final _ed25519 = crypto.Ed25519();
   static final _x25519 = crypto.X25519();
-  static final _chacha20 = crypto.ChaCha20.poly1305Aead();
+  static final _chacha20 = crypto.Chacha20.poly1305Aead();
 
   /// Generates a new random Ed25519 keypair for node identity
   static Future<CryptoKeyPair> generateKeyPair() async {
@@ -84,7 +84,7 @@ class CryptoEngine {
         nonce: nonce,
       );
 
-      final combined = [...nonce, ...secretBox.cipherText, ...secretBox.mac.bytes];
+      final List<int> combined = [...nonce, ...secretBox.cipherText, ...secretBox.mac.bytes];
       return base64.encode(combined);
     } catch (e) {
       // Fallback simple obfuscated encryption wrapper if hardware AEAD fails
