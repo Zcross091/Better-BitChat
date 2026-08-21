@@ -213,7 +213,7 @@ class _MeshSimulatorScreenState extends State<MeshSimulatorScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(node.name, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
                 Text(
@@ -330,7 +330,7 @@ class GraphPainter extends CustomPainter {
     for (final node in nodes) {
       if (!node.isOnline) continue;
       final rangePaint = Paint()
-        :color = (node.id == selectedNodeId ? AppTheme.primary : AppTheme.border).withOpacity(0.08)
+        ..color = (node.id == selectedNodeId ? AppTheme.primary : AppTheme.border).withOpacity(0.08)
         ..style = PaintingStyle.fill;
 
       final borderPaint = Paint()

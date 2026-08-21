@@ -80,7 +80,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
@@ -150,7 +150,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Emergency Panic Wipe', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.error)),
                         Text('Instantly purge all keys, stored bundles & contacts', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
