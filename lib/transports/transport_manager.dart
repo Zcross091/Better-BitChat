@@ -1,6 +1,6 @@
 import 'dart:async';
-import '../models/bundle.dart';
-import '../storage/bundle_store.dart';
+import '../core/models/bundle.dart';
+import '../core/storage/bundle_store.dart';
 
 enum TransportType { ble, wifiDirect, nostrGateway, sneakernet, simulator }
 

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import '../models/bundle.dart';
+import '../core/models/bundle.dart';
 import 'transport_manager.dart';
 
 class NostrGatewayTransport implements TransportDriver {

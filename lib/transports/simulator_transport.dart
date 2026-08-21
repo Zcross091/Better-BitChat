@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math';
-import '../models/bundle.dart';
-import '../storage/bundle_store.dart';
-import '../routing/prophet_router.dart';
+import '../core/models/bundle.dart';
+import '../core/storage/bundle_store.dart';
+import '../core/routing/prophet_router.dart';
 import 'transport_manager.dart';
 
 class SimNode {

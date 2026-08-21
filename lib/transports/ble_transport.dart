@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import '../models/bundle.dart';
+import '../core/models/bundle.dart';
 import 'transport_manager.dart';
 
 class BleTransport implements TransportDriver {

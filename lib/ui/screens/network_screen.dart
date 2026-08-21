@@ -104,7 +104,7 @@ class NetworkScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Higher scores ($P_{a,b}$) prioritize bundle forwarding toward peers statistically likely to reach destination:',
+                    'Higher scores (P_a,b) prioritize bundle forwarding toward peers statistically likely to reach destination:',
                     style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 12),
