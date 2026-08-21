@@ -110,8 +110,6 @@ jobs:
         run: |
           git checkout pubspec.yaml
           rm -f test/widget_test.dart
-          sed -i "s/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g" android/app/build.gradle
-          sed -i "s/minSdkVersion 19/minSdkVersion 21/g" android/app/build.gradle
 
       - name: Get Dependencies
         run: flutter pub get
