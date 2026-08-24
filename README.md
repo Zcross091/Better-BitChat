@@ -1,4 +1,4 @@
-# Resilient Mesh Messenger — Multi-Transport DTN Architecture
+# Resilient Mesh Messenger — Civilian WhatsApp Competitor & Multi-Transport DTN Architecture
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.19%2B-02569B?style=flat&logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.4%2B-0175C2?style=flat&logo=dart)](https://dart.dev)
@@ -6,20 +6,23 @@
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-green.svg)](.github/workflows/build_release.yml)
 [![StateCraft](https://img.shields.io/badge/Developer-StateCraft-082944.svg?style=flat&logo=github)](https://github.com/Zcross091)
 
-> **Mesh Messenger** is a resilient, offline-first mobile messaging application built on Flutter. Operating as a **Delay/Disruption-Tolerant Network (DTN)** based on **RFC 9171 (BPv7)**, it replaces brittle real-time connection requirements with opportunistic store-and-forward bundle routing across multiple transport drivers (BLE Mesh, USB-OTG Serial LoRa Hardware, LoRa 915MHz Radio, WiFi Direct P2P, Nostr Internet Gateways, and Sneakernet Fountain QR).
+> **Mesh Messenger** is a consumer-grade, privacy-first, offline-resilient messaging platform designed for everyday civilians and disaster response teams. Operating as a **Delay/Disruption-Tolerant Network (DTN)** based on **RFC 9171 (BPv7)**, it combines the familiar, rich UX of **WhatsApp and Signal** (Direct Messages, Private Groups, Custom `@handles`, Photos, Video Clips, Voice Notes with Waveforms, Emoji Reactions, and Delivery Ticks) with an unbreakable, off-grid multi-transport engine (BLE Mesh, LoRa 915MHz SX1262, USB-OTG Serial, WiFi Direct, Nostr Internet Relays, and Fountain QR Sneakernet).
 
 ---
 
-## 📌 Executive Summary
+## 📌 Executive Summary & WhatsApp Comparison
 
-Traditional peer-to-peer mesh messengers fail when an unbroken physical radio path between sender and recipient is unavailable at the moment of transmission. **Mesh Messenger** solves this link-breakage problem by shifting from packet-switched routing to a **Delay/Disruption-Tolerant Network (DTN)** architecture:
-
-- **Store-and-Forward**: Messages are serialized into self-contained, cryptographically signed and encrypted **Bundles**.
-- **Transport Agnostic**: Bundles hop seamlessly across short-range radio (BLE), USB-OTG serial companion radios, long-range LoRa 915MHz, high-speed local P2P (WiFi Direct), global Nostr WebSocket relays, and physical media (Animated Fountain QR codes).
-- **USB-OTG & Meshtastic Protocol Interop**: Direct physical connection to ESP32 companion radios (Heltec WiFi LoRa 32, LilyGO T-Beam) over 115,200 baud UART with binary packet framing (`0x94, 0xC3`).
-- **RFC 9171 §5.8 Fragmentation**: Payloads exceeding transport MTUs (e.g. 200 bytes for LoRa) are automatically sliced into micro-fragments and progressively reassembled out-of-order upon arrival.
-- **Group Sender Keys & Noise Protocol**: Signal-style O(1) multi-party group encryption with ratcheting forward secrecy.
-- **Persistent Encrypted Storage**: Hardware-keyed at-rest bundle store with priority-aware LRU cache eviction (protecting Emergency SOS payloads).
+| Feature | WhatsApp / Signal | Standard Tactical Mesh | **Mesh Messenger** |
+|---|---|---|---|
+| **Blackout / Off-Grid Resilient** | ❌ (Fails without internet) | ⚠️ (Brittle real-time link) | ✅ **100% Offline DTN Store-and-Forward** |
+| **Global Internet Chat** | ✅ (Centralized servers) | ❌ (Local radio only) | ✅ **Decentralized Nostr Relays (`damus.io`)** |
+| **Phone Number / Account Free** | ❌ (Phone number required) | ⚠️ (Raw 64-char hex key) | ✅ **Custom `@username`, Display Names, Bios, Avatars** |
+| **Direct Messaging (DMs)** | ✅ | ⚠️ (Basic 1-to-1) | ✅ **End-to-End Encrypted DMs with Delivery Receipts** |
+| **Private Group Chats** | ✅ | ❌ (Broadcast only) | ✅ **Encrypted Groups via Signal-Style Sender Keys** |
+| **Multimedia Suite** | ✅ | ❌ (Text only) | ✅ **Photos, Video Clips, Voice Notes (Waveforms), Geo-Pins** |
+| **Message Reactions & Replies** | ✅ | ❌ | ✅ **Emoji Reactions (👍❤️😂😮😢🙏) & Quoted Replies** |
+| **Contact Search & Directory** | ✅ | ❌ | ✅ **Instant Search by Handle, Name, or Key** |
+| **Anti-Forensic OpSec** | ❌ | ❌ | ✅ **Duress Mode, Panic Wipe, Flash Memory Sanitization** |
 
 ---
 
@@ -27,8 +30,11 @@ Traditional peer-to-peer mesh messengers fail when an unbroken physical radio pa
 
 ```mermaid
 graph TD
-    subgraph UI ["Application & Presentation Layer"]
-        AppUI["Flutter UI (Rich Media Chat, Live UART Terminal, Geo-Markers, Air-Gap Tools)"]
+    subgraph UI ["Civilian Presentation & UX Layer"]
+        Conversations["WhatsApp-Style Conversation List (DMs, Groups, Channels)"]
+        ChatStream["Civilian Chat Screen (Bubbles, Waveform Voice Player, Photo/Video)"]
+        Contacts["Contact Directory & Live Nearby Radio Radar"]
+        Profile["Profile Customizer (@handle, Avatar, Nostr NIP-05, Panic Wipe)"]
     end
 
     subgraph Security ["Identity & Cryptography Layer"]
@@ -38,9 +44,10 @@ graph TD
         Noise["Noise_XX Ephemeral Handshake Protocol"]
     end
 
-    subgraph DTN ["Bundle, Fragmentation & Storage (RFC 9171 / BPv7)"]
+    subgraph DTN ["DTN Bundle & Storage Layer (RFC 9171 / BPv7)"]
         BundleEngine["Bundle Serializer & Deduplication"]
-        FragEngine["RFC 9171 §5.8 Fragmentation & Reassembly"]
+        FragEngine["RFC 9171 §5.8 Fragmentation & Progressive Reassembly"]
+        ContactStore["Persistent Contact & Conversation Store"]
         PersistentStore["Persistent Encrypted Store with Priority LRU Quotas"]
     end
 
@@ -60,7 +67,7 @@ graph TD
         Simulator["In-App Visual Topology Mesh Simulator"]
     end
 
-    AppUI --> Security
+    UI --> Security
     Security --> DTN
     DTN --> Routing
     Routing --> Transport
@@ -75,14 +82,18 @@ graph TD
 
 ---
 
-## ✨ Key Capabilities
+## ✨ Key Civilian Capabilities
 
-- **USB-OTG & Bluetooth Serial Radio Bridge**: Connect directly via USB-C cable to ESP32 LoRa hardware (CH340/CP2102/FTDI) at 115,200 baud with real-time terminal monitor and packet injector.
-- **Meshtastic Protocol Interop**: Binary framing parser & serializer translating between native DTN `Bundle`s and Meshtastic `MeshPacket` frames.
-- **Multi-Transport Multiplexing**: Broadcasts bundles across all active radio, serial, and internet interfaces simultaneously.
-- **Rich Media DTN Payloads**: Supports text, Opus compressed voice notes, reconnaissance photos, and emergency GPS geo-markers.
-- **Optical Air-Gap Fountain QR Stream**: Rapid cycling animated QR droplets (6–14 fps) for transferring multi-kilobyte bundles camera-to-screen without radio emissions.
-- **PRoPHET Routing Engine**: Probabilistic delivery scoring ($P_{a,b}$) to route bundles toward peers statistically likely to reach the target destination.
+1. **Custom Handles & Civilian Profiles**: Customize your `@username`, display name, bio, and avatar color seed without ever providing a phone number or email address. Optional Nostr NIP-05 handle resolution (`user@mesh.nostr`).
+2. **Direct Messaging (DMs) with Delivery Receipts**: End-to-end encrypted 1-on-1 conversations with WhatsApp-style delivery tick marks (🕒 Pending, ✓ Stored in Mesh, ✓✓ Forwarded, ✓✓ Blue Read).
+3. **Private Multi-Party Groups**: Create private group chats (e.g. *#family*, *#neighborhood-relief*, *#hiking-squad*) encrypted with **Signal-style Group Sender Keys** ensuring forward secrecy.
+4. **Rich Multimedia Suite**:
+   - **Voice Notes**: Interactive audio bubbles with animated waveform visualization bars and play/pause scrubbers.
+   - **Photos & Videos**: Compressed image thumbnails with full-screen zoom and video clips with progressive micro-fragment reassembly.
+   - **Tactical Geo-Pins & SOS**: Real-time GPS coordinate sharing with emergency severity demarcation.
+5. **Emoji Reactions & Quoted Replies**: Long-press on any message to react with emojis (`👍`, `❤️`, `😂`, `😮`, `😢`, `🙏`) or create quoted reply threads.
+6. **Address Book & Nearby Radio Radar**: Instant contact search by name or `@handle`, plus real-time radar detecting nearby physical mesh nodes across Bluetooth Low Energy, LoRa 915MHz, and WiFi Direct.
+7. **Anti-Forensic Security & Panic Wipe**: One-tap emergency panic wipe that irreversibly purges private keys, contact lists, and message caches from flash memory.
 
 ---
 
@@ -94,13 +105,13 @@ Mesh Messenger/
 │   └── workflows/
 │       └── build_release.yml   # CI/CD Workflow for Android APK & Web releases
 ├── lib/
-│   ├── main.dart              # Application entry point & driver initialization
+│   ├── main.dart              # Application entry point & 5-tab consumer navigation
 │   ├── core/
 │   │   ├── crypto/            # Ed25519, ChaCha20, Group Sender Keys, Fountain QR, Noise
 │   │   ├── hardware/          # SerialPortDriver (UART 115200) & MeshtasticInterop
-│   │   ├── models/            # Bundle, BundleFragment (RFC 9171), MediaPayload
+│   │   ├── models/            # UserProfile, Contact, Conversation, ChatMessage, Bundle
 │   │   ├── routing/           # PRoPHET router & FragmentationEngine
-│   │   └── storage/           # PersistentBundleStore with priority LRU quotas
+│   │   └── storage/           # ContactStore & PersistentBundleStore
 │   ├── transports/            # Pluggable transport drivers
 │   │   ├── ble_transport.dart
 │   │   ├── lora_transport.dart
@@ -110,12 +121,14 @@ Mesh Messenger/
 │   │   ├── simulator_transport.dart
 │   │   ├── sneakernet_transport.dart
 │   │   └── transport_manager.dart
-│   └── ui/                    # Flutter UI & theme components
-│       ├── screens/           # Chat, Identity, Network, & Simulator screens
-│       ├── widgets/           # Animated Fountain QR Dialogs, Hardware Serial Console
+│   └── ui/                    # Consumer UI & theme components
+│       ├── screens/           # ConversationsList, CivilianChat, Contacts, Network, Profile
+│       ├── widgets/           # CreateGroupDialog, Fountain QR Dialog, Hardware Console
 │       └── theme/             # Modern dark mode theme system
-├── test/                      # Unit & protocol verification test suites (10 Suites)
+├── test/                      # Unit & protocol verification test suites (12 Suites)
 │   ├── bundle_test.dart
+│   ├── civilian_models_test.dart
+│   ├── contact_store_test.dart
 │   ├── crypto_test.dart
 │   ├── fountain_qr_test.dart
 │   ├── fragmentation_test.dart
@@ -144,7 +157,7 @@ cd Better-BitChat
 flutter pub get
 ```
 
-### 2. Run Protocol Verification Tests (10 Test Suites)
+### 2. Run All 12 Automated Test Suites
 ```bash
 flutter test
 ```

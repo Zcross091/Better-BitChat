@@ -5,6 +5,7 @@ import 'core/crypto/crypto_engine.dart';
 import 'core/models/bundle.dart';
 import 'core/models/media_payload.dart';
 import 'core/routing/prophet_router.dart';
+import 'core/storage/contact_store.dart';
 import 'core/storage/persistent_bundle_store.dart';
 import 'transports/ble_transport.dart';
 import 'transports/lora_transport.dart';
@@ -14,10 +15,11 @@ import 'transports/sneakernet_transport.dart';
 import 'transports/transport_manager.dart';
 import 'transports/usb_serial_lora_transport.dart';
 import 'transports/wifi_direct_transport.dart';
-import 'ui/screens/chat_screen.dart';
-import 'ui/screens/identity_screen.dart';
+import 'ui/screens/contacts_directory_screen.dart';
+import 'ui/screens/conversations_list_screen.dart';
 import 'ui/screens/mesh_simulator_screen.dart';
 import 'ui/screens/network_screen.dart';
+import 'ui/screens/profile_settings_screen.dart';
 import 'ui/theme/app_theme.dart';
 
 void main() async {
@@ -50,6 +52,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
 
   final PersistentBundleStore _bundleStore = PersistentBundleStore(maxCapacity: 1000);
+  final ContactStore _contactStore = ContactStore();
   final ProphetRouter _prophetRouter = ProphetRouter();
   final TransportManager _transportManager = TransportManager();
 
@@ -62,7 +65,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   late final SimulatorTransport _simulatorTransport;
 
   CryptoKeyPair? _myKeyPair;
-  List<Bundle> _bundlesList = [];
 
   @override
   void initState() {
@@ -74,8 +76,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     // 1. Generate local Ed25519 identity keypair
     _myKeyPair = await CryptoEngine.generateKeyPair();
 
-    // 2. Hydrate persistent encrypted storage from device
+    // 2. Hydrate persistent encrypted storage and contact store from device
     await _bundleStore.hydrate();
+    await _contactStore.hydrate(_myKeyPair?.publicKeyHex ?? 'pub_alice_ed25519_01');
 
     // 3. Initialize transport drivers
     _bleTransport = BleTransport();
@@ -99,97 +102,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     // 4. Listen to incoming bundles across all transports
     _transportManager.onBundleReceived.listen((bundle) {
       if (_bundleStore.storeBundle(bundle)) {
-        setState(() {
-          _bundlesList = _bundleStore.getAllBundles();
-        });
+        setState(() {});
       }
     });
 
-    // 5. Seed initial welcome DTN bundles if empty
-    if (_bundleStore.count == 0) {
-      final welcomePayload = MediaPayload.text(
-        'Welcome to Mesh Messenger DTN! Offline-first resilient messaging across BLE, LoRa, USB-Serial, WiFi Direct, and Nostr.',
-      );
-      final initialBundle = Bundle(
-        bundleId: Bundle.generateBundleId(
-          senderPubkey: 'pub_dave_gtw_04',
-          destPubkey: 'all',
-          createdAt: DateTime.now().millisecondsSinceEpoch,
-          nonce: 'seed_nonce_01',
-        ),
-        senderPubkey: 'pub_dave_gtw_04',
-        destPubkey: 'all',
-        createdAt: DateTime.now().millisecondsSinceEpoch,
-        ttlHours: 72,
-        hopCount: 1,
-        priority: BundlePriority.normal,
-        payload: welcomePayload.serialize(),
-        signature: 'sig_ed25519_dave_welcome',
-      );
-
-      final geoPayload = MediaPayload.geoMarker(
-        lat: 26.8467,
-        lon: 80.9462,
-        alt: 125.0,
-        label: 'Field Hub Relay Node Online (LoRa SF9 Locked)',
-        emergencySeverity: 1,
-      );
-      final geoBundle = Bundle(
-        bundleId: Bundle.generateBundleId(
-          senderPubkey: 'pub_bob_ed25519_02',
-          destPubkey: 'pub_eve_ed25519_05',
-          createdAt: DateTime.now().millisecondsSinceEpoch - 120000,
-          nonce: 'seed_nonce_02',
-        ),
-        senderPubkey: 'pub_bob_ed25519_02',
-        destPubkey: 'pub_eve_ed25519_05',
-        createdAt: DateTime.now().millisecondsSinceEpoch - 120000,
-        ttlHours: 48,
-        hopCount: 2,
-        priority: BundlePriority.high,
-        payload: geoPayload.serialize(),
-        signature: 'sig_ed25519_bob_geo',
-      );
-
-      _bundleStore.storeBundle(initialBundle);
-      _bundleStore.storeBundle(geoBundle);
-    }
-
-    setState(() {
-      _bundlesList = _bundleStore.getAllBundles();
-    });
+    setState(() {});
   }
 
-  void _handleSendMessage(String text, BundlePriority priority) async {
-    final senderPub = _myKeyPair?.publicKeyHex ?? 'pub_alice_ed25519_01';
-
-    final bundleId = Bundle.generateBundleId(
-      senderPubkey: senderPub,
-      destPubkey: 'pub_eve_ed25519_05',
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      nonce: UniqueKey().toString(),
-    );
-
-    // Sign canonical bundle bytes
-    final bundle = Bundle(
-      bundleId: bundleId,
-      senderPubkey: senderPub,
-      destPubkey: 'pub_eve_ed25519_05',
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      ttlHours: 24,
-      hopCount: 0,
-      priority: priority,
-      payload: text,
-      signature: 'sig_ed25519_alice_valid',
-    );
-
+  void _handleBroadcastBundle(Bundle bundle) async {
     _bundleStore.storeBundle(bundle);
-    _prophetRouter.recordEncounter('pub_eve_ed25519_05');
+    _prophetRouter.recordEncounter(bundle.destPubkey);
     await _transportManager.broadcastBundle(bundle);
-
-    setState(() {
-      _bundlesList = _bundleStore.getAllBundles();
-    });
+    setState(() {});
   }
 
   void _handleImportSneakernetQr(String rawPayload) {
@@ -200,19 +124,24 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   void _handlePanicWipe() async {
     await _bundleStore.clearAll();
+    await _contactStore.clearAll();
     _prophetRouter.reset();
     _myKeyPair = await CryptoEngine.generateKeyPair();
-    setState(() {
-      _bundlesList = [];
-    });
+    await _contactStore.hydrate(_myKeyPair!.publicKeyHex);
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final screens = [
-      ChatScreen(
-        storedBundles: _bundlesList,
-        onSendMessage: _handleSendMessage,
+      ConversationsListScreen(
+        contactStore: _contactStore,
+        onBroadcastBundle: _handleBroadcastBundle,
+      ),
+      ContactsDirectoryScreen(
+        contactStore: _contactStore,
+        transportManager: _transportManager,
+        onBroadcastBundle: _handleBroadcastBundle,
       ),
       NetworkScreen(
         transportManager: _transportManager,
@@ -223,12 +152,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         simulator: _simulatorTransport,
         onSendSimulatedBundle: (bundle) {
           _bundleStore.storeBundle(bundle);
-          setState(() {
-            _bundlesList = _bundleStore.getAllBundles();
-          });
+          setState(() {});
         },
       ),
-      IdentityScreen(
+      ProfileSettingsScreen(
+        contactStore: _contactStore,
         keyPair: _myKeyPair,
         onImportSneakernetQr: _handleImportSneakernetQr,
         onEmergencyPanicWipe: _handlePanicWipe,
@@ -251,12 +179,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           NavigationDestination(
             icon: Icon(LucideIcons.messageSquare),
             selectedIcon: Icon(LucideIcons.messageSquare, color: AppTheme.primary),
-            label: 'DTN Chat',
+            label: 'Chats',
+          ),
+          NavigationDestination(
+            icon: Icon(LucideIcons.bookUser),
+            selectedIcon: Icon(LucideIcons.bookUser, color: AppTheme.primary),
+            label: 'Contacts',
           ),
           NavigationDestination(
             icon: Icon(LucideIcons.network),
             selectedIcon: Icon(LucideIcons.network, color: AppTheme.primary),
-            label: 'Transports',
+            label: 'Radios',
           ),
           NavigationDestination(
             icon: Icon(LucideIcons.activity),
@@ -266,7 +199,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           NavigationDestination(
             icon: Icon(LucideIcons.shield),
             selectedIcon: Icon(LucideIcons.shield, color: AppTheme.primary),
-            label: 'Identity',
+            label: 'Profile',
           ),
         ],
       ),
