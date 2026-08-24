@@ -169,7 +169,7 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
             final participants = [myPubKey, ..._selectedContactPubKeys];
             final groupId = 'group_${DateTime.now().millisecondsSinceEpoch}';
 
-            final initialSenderKey = GroupSenderKeyEngine.createSenderKey(groupId: groupId);
+            final initialSenderKey = GroupSenderKeyEngine.createMySenderKey(groupId, myPubKey);
 
             final groupConv = Conversation(
               id: groupId,

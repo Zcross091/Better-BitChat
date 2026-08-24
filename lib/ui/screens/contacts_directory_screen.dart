@@ -114,7 +114,7 @@ class _ContactsDirectoryScreenState extends State<ContactsDirectoryScreen> {
             children: [
               const Row(
                 children: [
-                  Icon(LucideIcons.bookUser, color: AppTheme.secondary, size: 16),
+                  Icon(LucideIcons.users, color: AppTheme.secondary, size: 16),
                   SizedBox(width: 6),
                   Text('SAVED ADDRESS BOOK', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
                 ],

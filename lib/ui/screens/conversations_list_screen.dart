@@ -64,7 +64,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.usersPlus, color: AppTheme.primary),
+            icon: const Icon(LucideIcons.userPlus, color: AppTheme.primary),
             tooltip: 'New Group',
             onPressed: () {
               showDialog(

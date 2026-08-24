@@ -182,8 +182,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             label: 'Chats',
           ),
           NavigationDestination(
-            icon: Icon(LucideIcons.bookUser),
-            selectedIcon: Icon(LucideIcons.bookUser, color: AppTheme.primary),
+            icon: Icon(LucideIcons.users),
+            selectedIcon: Icon(LucideIcons.users, color: AppTheme.primary),
             label: 'Contacts',
           ),
           NavigationDestination(

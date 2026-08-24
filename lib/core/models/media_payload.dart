@@ -4,6 +4,7 @@ enum MediaPayloadType {
   text,
   voiceNote,
   image,
+  videoClip,
   geoMarker,
 }
 
@@ -16,7 +17,7 @@ class MediaPayload {
   final int? audioDurationSec;
   final String? audioWaveformBase64;
   
-  // Image attachment attributes
+  // Image / Video attachment attributes
   final int? imageWidth;
   final int? imageHeight;
   final String? thumbnailBase64;
@@ -81,6 +82,20 @@ class MediaPayload {
     );
   }
 
+  /// Helper factory for video clip
+  factory MediaPayload.videoClip({
+    required String thumbnailBase64,
+    required int durationSec,
+    String? caption,
+  }) {
+    return MediaPayload(
+      type: MediaPayloadType.videoClip,
+      textContent: caption ?? 'Video Clip (${durationSec}s)',
+      audioDurationSec: durationSec,
+      thumbnailBase64: thumbnailBase64,
+    );
+  }
+
   /// Helper factory for tactical geo-marker / SOS
   factory MediaPayload.geoMarker({
     required double lat,
@@ -120,7 +135,7 @@ class MediaPayload {
       if (audioWaveformBase64 != null) 'audio_data': audioWaveformBase64,
       if (imageWidth != null) 'image_width': imageWidth,
       if (imageHeight != null) 'image_height': imageHeight,
-      if (thumbnailBase64 != null) 'thumbnail_data': thumbnailBase64,
+      if (thumbnailBase64 != null) 'thumb_data': thumbnailBase64,
       if (latitude != null) 'lat': latitude,
       if (longitude != null) 'lon': longitude,
       if (altitudeMeters != null) 'alt': altitudeMeters,
@@ -130,14 +145,15 @@ class MediaPayload {
   }
 
   factory MediaPayload.fromJson(Map<String, dynamic> json) {
+    final typeIdx = (json['type'] as int? ?? 0).clamp(0, MediaPayloadType.values.length - 1);
     return MediaPayload(
-      type: MediaPayloadType.values[json['type'] as int? ?? 0],
+      type: MediaPayloadType.values[typeIdx],
       textContent: json['text'] as String? ?? '',
       audioDurationSec: json['audio_duration'] as int?,
       audioWaveformBase64: json['audio_data'] as String?,
       imageWidth: json['image_width'] as int?,
       imageHeight: json['image_height'] as int?,
-      thumbnailBase64: json['thumbnail_data'] as String?,
+      thumbnailBase64: json['thumb_data'] as String?,
       latitude: (json['lat'] as num?)?.toDouble(),
       longitude: (json['lon'] as num?)?.toDouble(),
       altitudeMeters: (json['alt'] as num?)?.toDouble(),
