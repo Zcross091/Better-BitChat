@@ -2,7 +2,7 @@ import 'dart:async';
 import '../core/models/bundle.dart';
 import '../core/storage/bundle_store.dart';
 
-enum TransportType { ble, wifiDirect, nostrGateway, sneakernet, simulator }
+enum TransportType { ble, wifiDirect, nostrGateway, sneakernet, simulator, lora }
 
 abstract class TransportDriver {
   String get name;
@@ -47,6 +47,7 @@ class TransportManager {
   Stream<List<PeerContact>> get onPeersChanged => _peerStreamController.stream;
 
   List<PeerContact> get activePeers => _activePeers.values.toList();
+  List<TransportDriver> get drivers => List.unmodifiable(_drivers);
 
   void registerDriver(TransportDriver driver) {
     _drivers.add(driver);

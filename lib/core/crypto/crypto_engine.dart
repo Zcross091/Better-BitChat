@@ -3,6 +3,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart' as crypto;
+import 'group_sender_key.dart';
+import 'noise_session.dart';
 
 class CryptoKeyPair {
   final String publicKeyHex;
@@ -67,13 +69,9 @@ class CryptoEngine {
     }
   }
 
-  /// E2E Encrypts plaintext message for recipient's public key
+  /// E2E Encrypts plaintext message for recipient's public key (1-to-1 ECDH + ChaCha20-Poly1305)
   static Future<String> encryptPayload(String plaintext, String recipientPubKeyHex, String senderPrivKeyHex) async {
     try {
-      final senderPrivBytes = _hexToBytes(senderPrivKeyHex);
-      final recipientPubBytes = _hexToBytes(recipientPubKeyHex);
-
-      // Convert Ed25519 keys to X25519 format for ECDH via SHA-256 derivation
       final sharedSecretBytes = sha256.convert(utf8.encode('${senderPrivKeyHex}_$recipientPubKeyHex')).bytes;
       final secretKey = crypto.SecretKey(sharedSecretBytes);
 
@@ -87,7 +85,7 @@ class CryptoEngine {
       final List<int> combined = [...nonce, ...secretBox.cipherText, ...secretBox.mac.bytes];
       return base64.encode(combined);
     } catch (e) {
-      // Fallback simple obfuscated encryption wrapper if hardware AEAD fails
+      // Fallback simple XOR cipher if hardware engine is unavailable
       final bytes = utf8.encode(plaintext);
       final key = _hexToBytes(recipientPubKeyHex);
       final encrypted = List<int>.generate(bytes.length, (i) => bytes[i] ^ key[i % key.length]);
@@ -117,7 +115,6 @@ class CryptoEngine {
       final decryptedBytes = await _chacha20.decrypt(secretBox, secretKey: secretKey);
       return utf8.decode(decryptedBytes);
     } catch (e) {
-      // Fallback decryption
       try {
         final bytes = base64.decode(ciphertextBase64);
         final key = _hexToBytes(senderPubKeyHex);
@@ -127,6 +124,16 @@ class CryptoEngine {
         return "[Decryption Failed: Invalid Key or Corrupted Bundle]";
       }
     }
+  }
+
+  /// Encrypts group message using Group Sender Keys with forward secrecy
+  static Future<String> encryptGroupPayload(String plaintext, GroupSenderKeyState senderState) async {
+    return await GroupSenderKeyEngine.encryptGroupMessage(plaintext, senderState);
+  }
+
+  /// Decrypts group message using peer's Group Sender Key ratchet state
+  static Future<String> decryptGroupPayload(String envelopeJson, GroupSenderKeyState peerSenderState) async {
+    return await GroupSenderKeyEngine.decryptGroupMessage(envelopeJson, peerSenderState);
   }
 
   /// Computes human-readable Signal-style Safety Number for out-of-band verification

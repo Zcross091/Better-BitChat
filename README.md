@@ -6,7 +6,7 @@
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-green.svg)](.github/workflows/build_release.yml)
 [![StateCraft](https://img.shields.io/badge/Developer-StateCraft-082944.svg?style=flat&logo=github)](https://github.com/Zcross091)
 
-> **Mesh Messenger** is a resilient, offline-first mobile messaging application built on Flutter. Operating as a **Delay/Disruption-Tolerant Network (DTN)** based on **RFC 9171 (BPv7)**, it replaces brittle real-time connection requirements with opportunistic store-and-forward bundle routing across multiple transport drivers (BLE Mesh, Nostr Internet Gateways, and Sneakernet QR/Files).
+> **Mesh Messenger** is a resilient, offline-first mobile messaging application built on Flutter. Operating as a **Delay/Disruption-Tolerant Network (DTN)** based on **RFC 9171 (BPv7)**, it replaces brittle real-time connection requirements with opportunistic store-and-forward bundle routing across multiple transport drivers (BLE Mesh, LoRa 915MHz Radio, WiFi Direct P2P, Nostr Internet Gateways, and Sneakernet Fountain QR).
 
 ---
 
@@ -15,8 +15,10 @@
 Traditional peer-to-peer mesh messengers fail when an unbroken physical radio path between sender and recipient is unavailable at the moment of transmission. **Mesh Messenger** solves this link-breakage problem by shifting from packet-switched routing to a **Delay/Disruption-Tolerant Network (DTN)** architecture:
 
 - **Store-and-Forward**: Messages are serialized into self-contained, cryptographically signed and encrypted **Bundles**.
-- **Transport Agnostic**: Bundles hop seamlessly across short-range radio (BLE), global Nostr WebSocket relays, and physical media (QR codes / USB drives).
-- **Epidemic & PRoPHET Routing**: Peer encounters build statistical delivery predictability matrices ($P_{a,b}$) to route bundles toward peers most likely to reach the target destination.
+- **Transport Agnostic**: Bundles hop seamlessly across short-range radio (BLE), long-range companion radio (LoRa 915MHz), high-speed local P2P (WiFi Direct), global Nostr WebSocket relays, and physical media (Animated Fountain QR codes).
+- **RFC 9171 §5.8 Fragmentation**: Payloads exceeding transport MTUs (e.g. 200 bytes for LoRa) are automatically sliced into micro-fragments and progressively reassembled out-of-order upon arrival.
+- **Group Sender Keys & Noise Protocol**: Signal-style $O(1)$ multi-party group encryption with ratcheting forward secrecy.
+- **Persistent Encrypted Storage**: Hardware-keyed at-rest bundle store with priority-aware LRU cache eviction (protecting Emergency SOS payloads).
 
 ---
 
@@ -25,30 +27,34 @@ Traditional peer-to-peer mesh messengers fail when an unbroken physical radio pa
 ```mermaid
 graph TD
     subgraph UI ["Application & Presentation Layer"]
-        AppUI["Flutter UI (Chat, Channel, Visual Simulator, Vitals Matrix)"]
+        AppUI["Flutter UI (Rich Media Chat, Voice Notes, Tactical Geo-Markers, Air-Gap Tools)"]
     end
 
     subgraph Security ["Identity & Cryptography Layer"]
         Ed25519["Ed25519 Signatures"]
         ChaCha["ChaCha20-Poly1305 E2E Encryption"]
-        X25519["X25519 ECDH Key Exchange"]
+        GroupKeys["Signal-Style Group Sender Keys Ratchet"]
+        Noise["Noise_XX Ephemeral Handshake Protocol"]
     end
 
-    subgraph DTN ["Bundle & Storage Layer (RFC 9171 / BPv7)"]
+    subgraph DTN ["Bundle, Fragmentation & Storage (RFC 9171 / BPv7)"]
         BundleEngine["Bundle Serializer & Deduplication"]
-        Store["Bounded LRU BundleStore (Capacity & TTL Decay)"]
+        FragEngine["RFC 9171 §5.8 Fragmentation & Reassembly"]
+        PersistentStore["Persistent Encrypted Store with Priority LRU Quotas"]
     end
 
     subgraph Routing ["Routing Engine"]
         Prophet["PRoPHET Routing (Predictability Matrix P_a,b)"]
-        Vector["Summary Vector Exchange (Bloom Filter / ID Hash)"]
+        Vector["Summary Vector Handshake (Bloom Filter / ID Hash)"]
     end
 
-    subgraph Transport ["Transport Driver Abstraction"]
+    subgraph Transport ["Multi-Transport Driver Abstraction"]
         Manager["TransportManager Drivers Controller"]
-        BLE["BLE Mesh Driver (~10-100m Radio)"]
+        BLE["BLE Mesh Driver (~10-50m Radio)"]
+        LoRa["LoRa 915MHz Driver (SX1262 2-15km)"]
+        WiFiP2P["WiFi Direct / Apple Multipeer P2P"]
         Nostr["Nostr Relay Gateway Driver (wss://relay.damus.io)"]
-        Sneakernet["Sneakernet Driver (QR Codes / File Import-Export)"]
+        Fountain["Optical Fountain QR Sneakernet Stream"]
         Simulator["In-App Visual Topology Mesh Simulator"]
     end
 
@@ -57,39 +63,23 @@ graph TD
     DTN --> Routing
     Routing --> Transport
     Manager --> BLE
+    Manager --> LoRa
+    Manager --> WiFiP2P
     Manager --> Nostr
-    Manager --> Sneakernet
+    Manager --> Fountain
     Manager --> Simulator
 ```
 
 ---
 
-## ✨ Key Features
+## ✨ Key Capabilities
 
 - **Multi-Transport Multiplexing**: Broadcasts bundles across all active radio and internet interfaces simultaneously.
-- **End-to-End Encryption (E2EE)**: Payloads are encrypted using **ChaCha20-Poly1305** and authenticated with **Ed25519** keypairs before touching any transport layer.
-- **Self-Contained Bundles (RFC 9171)**: Each bundle carries its own TTL, hop counter, priority flag, and deduplication ID (`hash(sender_pubkey || nonce)`).
-- **PRoPHET Routing Engine**: Implements probabilistic delivery scoring ($P_{a,b}$) to eliminate unnecessary broadcast storms while maximizing delivery probability.
-- **Nostr Relay Bridge**: Bridges isolated offline local meshes over the internet using custom Nostr protocol event kinds (`Kind 20000`).
-- **In-App Visual Mesh Simulator**: Real-time canvas to drag nodes, simulate node outages, and observe store-and-forward bundle propagation in real time.
-
----
-
-## 📄 Bundle Specification (RFC 9171 Adaptation)
-
-```text
-Bundle {
-  bundle_id:        String (SHA-256 hash of sender_pubkey + nonce)
-  sender_pubkey:    String (Ed25519 Public Key Hex)
-  dest_pubkey:      String (Recipient Public Key Hex or 'all')
-  created_at:       int (Unix Epoch Milliseconds)
-  ttl_seconds:      int (Time-To-Live duration)
-  hop_count:        int (Hop Counter, incremented per forward)
-  priority:         enum { low, normal, high }
-  payload:          String (Encrypted Ciphertext Base64)
-  signature:        String (Ed25519 Signature Hex)
-}
-```
+- **LoRa Radio Companion Integration**: Connects with Meshtastic / Heltec ESP32 SX1262 LoRa modules (SF7–SF12, 915MHz) for long-range city-scale mesh communication.
+- **WiFi Direct Burst Link**: High-throughput local rendezvous channel for rapid multi-megabyte bundle exchange.
+- **Rich Media DTN Payloads**: Supports text, Opus compressed voice notes, reconnaissance photos, and emergency GPS geo-markers.
+- **Optical Air-Gap Fountain QR Stream**: Rapid cycling animated QR droplets (8–12 fps) for transferring multi-kilobyte bundles camera-to-screen without radio emissions.
+- **PRoPHET Routing Engine**: Probabilistic delivery scoring ($P_{a,b}$) to route bundles toward peers statistically likely to reach the target destination.
 
 ---
 
@@ -103,22 +93,30 @@ Mesh Messenger/
 ├── lib/
 │   ├── main.dart              # Application entry point & driver initialization
 │   ├── core/
-│   │   ├── crypto/            # Ed25519 & ChaCha20-Poly1305 engine
-│   │   ├── models/            # DTN Bundle data model (RFC 9171)
-│   │   ├── routing/           # PRoPHET routing & encounter matrix
-│   │   └── storage/           # Bounded LRU store with TTL pruning
+│   │   ├── crypto/            # Ed25519, ChaCha20, Group Sender Keys, Fountain QR, Noise
+│   │   ├── models/            # Bundle, BundleFragment (RFC 9171), MediaPayload
+│   │   ├── routing/           # PRoPHET router & FragmentationEngine
+│   │   └── storage/           # PersistentBundleStore with priority LRU quotas
 │   ├── transports/            # Pluggable transport drivers
 │   │   ├── ble_transport.dart
+│   │   ├── lora_transport.dart
+│   │   ├── wifi_direct_transport.dart
 │   │   ├── nostr_gateway_transport.dart
 │   │   ├── simulator_transport.dart
 │   │   ├── sneakernet_transport.dart
 │   │   └── transport_manager.dart
 │   └── ui/                    # Flutter UI & theme components
 │       ├── screens/           # Chat, Identity, Network, & Simulator screens
+│       ├── widgets/           # Animated Fountain QR Dialogs & controls
 │       └── theme/             # Modern dark mode theme system
-├── test/                      # Unit & protocol verification tests
+├── test/                      # Unit & protocol verification test suites
 │   ├── bundle_test.dart
 │   ├── crypto_test.dart
+│   ├── fountain_qr_test.dart
+│   ├── fragmentation_test.dart
+│   ├── group_sender_key_test.dart
+│   ├── lora_transport_test.dart
+│   ├── persistent_store_test.dart
 │   └── routing_test.dart
 └── pubspec.yaml               # Package manifest & dependencies
 ```
@@ -139,7 +137,7 @@ cd Better-BitChat
 flutter pub get
 ```
 
-### 2. Run Protocol Verification Tests
+### 2. Run Protocol Verification Tests (8 Test Suites)
 ```bash
 flutter test
 ```
@@ -149,27 +147,6 @@ flutter test
 # Launch on connected mobile device or emulator
 flutter run
 ```
-
----
-
-## ⚙️ Automated CI/CD Pipeline
-
-The project includes an automated GitHub Actions pipeline ([.github/workflows/build_release.yml](file:///.github/workflows/build_release.yml)):
-
-- **Triggers**: Automated build on push to `main` or `master` branches, tag pushes (`v*`), or manual execution.
-- **Build Pipeline**:
-  1. Compiles release binaries for **Android (APK)**.
-  2. Generates standalone **Web Release Bundles**.
-  3. Executes unit and routing test suites automatically.
-  4. Publishes a versioned **GitHub Release** attached with runnable artifacts.
-
----
-
-## ⚖️ Security Model
-
-1. **Zero Trust Relays**: Intermediate relay nodes (phones, field boxes, or public Nostr servers) only inspect routing headers (`bundle_id`, `ttl`, `dest_pubkey`). Payload contents remain fully encrypted end-to-end.
-2. **Anti-Replay & Deduplication**: Summary vector handshakes prevent double-forwarding and infinite loop proliferation.
-3. **Cryptographic Signatures**: All bundles are signed by the sender's Ed25519 private key to ensure non-repudiation and origin verification.
 
 ---
 

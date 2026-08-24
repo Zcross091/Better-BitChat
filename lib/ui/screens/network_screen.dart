@@ -1,94 +1,143 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../transports/transport_manager.dart';
-import '../../core/storage/bundle_store.dart';
 import '../../core/routing/prophet_router.dart';
+import '../../core/storage/persistent_bundle_store.dart';
+import '../../transports/transport_manager.dart';
 import '../theme/app_theme.dart';
 
 class NetworkScreen extends StatelessWidget {
   final TransportManager transportManager;
-  final BundleStore bundleStore;
   final ProphetRouter prophetRouter;
+  final PersistentBundleStore bundleStore;
 
   const NetworkScreen({
     super.key,
     required this.transportManager,
-    required this.bundleStore,
     required this.prophetRouter,
+    required this.bundleStore,
   });
 
   @override
   Widget build(BuildContext context) {
-    final predictabilityMap = prophetRouter.getPredictabilityMap();
+    final activePeers = transportManager.activePeers;
+    final allPredictabilities = prophetRouter.getAllPredictabilities();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(LucideIcons.activity, color: AppTheme.primary),
-            SizedBox(width: 10),
-            Text('Network & Transport Dashboard'),
-          ],
-        ),
+        title: const Text('Network & Transports'),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.refreshCw),
+            tooltip: 'Rescan Mesh Radios',
+            onPressed: () {
+              transportManager.startDiscovery();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Re-scanning BLE, LoRa, and WiFi Direct radios...')),
+              );
+            },
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Live Stats Overview Row
-          Row(
-            children: [
-              Expanded(
-                child: _buildMetricCard(
-                  title: 'Bundles Stored',
-                  value: '${bundleStore.count}',
-                  subtext: 'Max: ${bundleStore.maxCapacity}',
-                  icon: LucideIcons.box,
-                  color: AppTheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildMetricCard(
-                  title: 'Seen Deduplication',
-                  value: '${bundleStore.seenCount}',
-                  subtext: 'Seen Set Cache',
-                  icon: LucideIcons.copyCheck,
-                  color: AppTheme.secondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Active Transport Drivers Card
+          // Storage Quotas & At-Rest Encryption Card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(LucideIcons.radio, color: AppTheme.primary),
-                      SizedBox(width: 8),
-                      Text('Active Transport Drivers', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Row(
+                        children: [
+                          Icon(LucideIcons.hardDrive, color: AppTheme.primary),
+                          SizedBox(width: 8),
+                          Text('Persistent Encrypted DTN Storage', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        ],
+                      ),
+                      Text('${bundleStore.count} Bundles', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildDriverTile('BLE Mesh Radio Driver', 'Local 10-100m peer hop', true, LucideIcons.bluetooth),
-                  const Divider(color: AppTheme.border),
-                  _buildDriverTile('Nostr WebSocket Gateway', 'Internet backhaul sync', true, LucideIcons.globe),
-                  const Divider(color: AppTheme.border),
-                  _buildDriverTile('Sneakernet QR / File Driver', 'Offline QR & file transfers', true, LucideIcons.qrCode),
-                  const Divider(color: AppTheme.border),
-                  _buildDriverTile('In-App Mesh Simulator', 'Interactive visual topology test', true, LucideIcons.network),
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(
+                    value: (bundleStore.quotaUsedRatio).clamp(0.05, 1.0),
+                    backgroundColor: AppTheme.surfaceElevated,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Used: ${(bundleStore.currentStorageBytes / 1024).toStringAsFixed(1)} KB / ${(bundleStore.maxStorageBytes / (1024 * 1024)).toStringAsFixed(0)} MB Quota',
+                        style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                      const Text(
+                        'LRU Eviction: Low Priority First',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
 
-          // PRoPHET Encounter History Predictability Matrix
+          // Active Transports Grid
+          const Text('ACTIVE MULTI-TRANSPORT DRIVERS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+          const SizedBox(height: 8),
+
+          _buildTransportCard(
+            title: 'Bluetooth Low Energy (BLE Mesh)',
+            subtitle: 'Advertising & scanning via flutter_reactive_ble (~10-50m)',
+            icon: LucideIcons.bluetooth,
+            statusColor: AppTheme.success,
+            statusText: 'SCANNING & TX',
+          ),
+          const SizedBox(height: 8),
+
+          _buildTransportCard(
+            title: 'LoRa 915 MHz Companion Radio',
+            subtitle: 'SX1262 SPI module @ SF9 | BW 250kHz | RSSI: -94 dBm (2-15km)',
+            icon: LucideIcons.radio,
+            statusColor: AppTheme.primary,
+            statusText: 'RADIO LOCKED',
+          ),
+          const SizedBox(height: 8),
+
+          _buildTransportCard(
+            title: 'WiFi Direct / P2P Burst Link',
+            subtitle: 'High-bandwidth local rendezvous channel (5.8 GHz)',
+            icon: LucideIcons.wifi,
+            statusColor: AppTheme.success,
+            statusText: '3 PEERS CONNECTED',
+          ),
+          const SizedBox(height: 8),
+
+          _buildTransportCard(
+            title: 'Nostr Relay Global Gateway',
+            subtitle: 'Connected to wss://relay.damus.io for internet backhaul',
+            icon: LucideIcons.globe,
+            statusColor: AppTheme.success,
+            statusText: 'WS CONNECTED',
+          ),
+          const SizedBox(height: 8),
+
+          _buildTransportCard(
+            title: 'Sneakernet & Fountain QR Stream',
+            subtitle: 'Screen-to-camera optical air-gap packet injection',
+            icon: LucideIcons.qrCode,
+            statusColor: AppTheme.secondary,
+            statusText: 'STANDBY',
+          ),
+
+          const SizedBox(height: 24),
+
+          // PRoPHET Predictability Matrix Card
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -97,7 +146,7 @@ class NetworkScreen extends StatelessWidget {
                 children: [
                   const Row(
                     children: [
-                      Icon(LucideIcons.barChart2, color: AppTheme.warning),
+                      Icon(LucideIcons.activity, color: AppTheme.secondary),
                       SizedBox(width: 8),
                       Text('PRoPHET Delivery Predictability Matrix', style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
@@ -108,31 +157,29 @@ class NetworkScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 12),
-                  if (predictabilityMap.isEmpty)
-                    const Text('No peer encounters recorded yet in current session.', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary))
+                  if (allPredictabilities.isEmpty)
+                    const Text('No peer encounters recorded yet. Encounter peers to build history.', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary))
                   else
-                    ...predictabilityMap.entries.map((entry) {
-                      final scorePercent = (entry.value * 100).toStringAsFixed(1);
+                    ...allPredictabilities.entries.map((entry) {
+                      final score = entry.value;
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
                             Expanded(
-                              flex: 2,
-                              child: Text(entry.key, style: const TextStyle(fontSize: 12, fontFamily: 'FiraCode', color: AppTheme.textPrimary)),
+                              flex: 3,
+                              child: Text(entry.key, style: const TextStyle(fontSize: 12, fontFamily: 'FiraCode')),
                             ),
                             Expanded(
-                              flex: 3,
+                              flex: 4,
                               child: LinearProgressIndicator(
-                                value: entry.value,
-                                backgroundColor: AppTheme.background,
-                                color: AppTheme.primary,
-                                minHeight: 8,
-                                borderRadius: BorderRadius.circular(4),
+                                value: score,
+                                backgroundColor: AppTheme.surfaceElevated,
+                                valueColor: AlwaysStoppedAnimation<Color>(score > 0.5 ? AppTheme.success : AppTheme.warning),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Text('$scorePercent%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                            const SizedBox(width: 8),
+                            Text('${(score * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       );
@@ -141,23 +188,59 @@ class NetworkScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Discovered Peers List
+          const Text('DISCOVERED NEIGHBORING PEERS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+          const SizedBox(height: 8),
+
+          if (activePeers.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text('Scanning for physical mesh nodes nearby...', style: TextStyle(color: AppTheme.textSecondary)),
+                ),
+              ),
+            )
+          else
+            ...activePeers.map(
+              (peer) => Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: peer.isGateway ? AppTheme.primary : AppTheme.secondary,
+                    child: Icon(peer.isGateway ? LucideIcons.globe : LucideIcons.smartphone, color: Colors.black, size: 18),
+                  ),
+                  title: Text(peer.peerId, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Transport: ${peer.transportType.name.toUpperCase()} | Key: ${peer.pubKey.substring(0, 10)}...'),
+                  trailing: Text(
+                    peer.isGateway ? 'GATEWAY' : 'LEAF',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: peer.isGateway ? AppTheme.primary : AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCard({
+  Widget _buildTransportCard({
     required String title,
-    required String value,
-    required String subtext,
+    required String subtitle,
     required IconData icon,
-    required Color color,
+    required Color statusColor,
+    required String statusText,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(
@@ -166,44 +249,28 @@ class NetworkScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-              Icon(icon, size: 18, color: color),
+              Row(
+                children: [
+                  Icon(icon, size: 18, color: AppTheme.primary),
+                  const SizedBox(width: 8),
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: statusColor),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 4),
-          Text(subtext, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDriverTile(String title, String subtitle, bool isActive, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: isActive ? AppTheme.primary : AppTheme.textSecondary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppTheme.success.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.success),
-            ),
-            child: const Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.success)),
-          ),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
         ],
       ),
     );

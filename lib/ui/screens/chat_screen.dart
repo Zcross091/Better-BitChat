@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/models/bundle.dart';
+import '../../core/models/media_payload.dart';
 import '../theme/app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -26,7 +28,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final relevantBundles = widget.storedBundles
-        .where((b) => b.destPubkey == _activePeerPubKey || b.senderPubkey == _activePeerPubKey || b.destPubkey == 'all')
+        .where((b) => b.destPubkey == _activePeerPubKey || b.senderPubkey == _activePeerPubKey || b.destPubkey == 'all' || b.destPubkey.startsWith('group_'))
         .toList();
 
     return Scaffold(
@@ -50,6 +52,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(LucideIcons.paperclip, color: AppTheme.primary),
+            tooltip: 'Attach Media or Geo-SOS',
+            onPressed: _showAttachmentSheet,
+          ),
+          IconButton(
             icon: const Icon(LucideIcons.shieldCheck, color: AppTheme.primary),
             tooltip: 'Key Safety Number',
             onPressed: () {
@@ -72,7 +79,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   _buildPeerChip('Bob (Relay Node)', 'pub_bob_ed25519_02', LucideIcons.cpu),
                   const SizedBox(width: 8),
+                  _buildPeerChip('LoRa Field Node', 'pub_lora_node_03', LucideIcons.radio),
+                  const SizedBox(width: 8),
                   _buildPeerChip('Nostr Internet Gateway', 'pub_dave_gtw_04', LucideIcons.globe),
+                  const SizedBox(width: 8),
+                  _buildPeerChip('#rescue-team (Group)', 'group_rescue_01', LucideIcons.users),
                   const SizedBox(width: 8),
                   _buildPeerChip('#broadcast-mesh', 'all', LucideIcons.hash),
                 ],
@@ -92,7 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         const Text('No DTN Bundles in Storage yet', style: TextStyle(color: AppTheme.textSecondary)),
                         const SizedBox(height: 6),
                         Text(
-                          'Send a message to create a signed & encrypted DTN bundle.',
+                          'Send a message or attach a Geo-SOS to create a signed DTN bundle.',
                           style: TextStyle(fontSize: 12, color: AppTheme.textSecondary.withOpacity(0.7)),
                         ),
                       ],
@@ -142,17 +153,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildBundleBubble(Bundle bundle, bool isMe) {
+    final media = MediaPayload.deserialize(bundle.payload);
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isMe ? AppTheme.primary.withOpacity(0.15) : AppTheme.surfaceElevated,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isMe ? AppTheme.primary.withOpacity(0.4) : AppTheme.border,
+            color: bundle.priority == BundlePriority.high
+                ? AppTheme.warning.withOpacity(0.8)
+                : (isMe ? AppTheme.primary.withOpacity(0.4) : AppTheme.border),
           ),
         ),
         child: Column(
@@ -165,7 +180,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 const Icon(LucideIcons.lock, size: 12, color: AppTheme.primary),
                 const SizedBox(width: 4),
                 Text(
-                  'Bundle ID: ${bundle.bundleId.substring(0, 8)}',
+                  'Bundle: ${bundle.bundleId.substring(0, 8)}',
                   style: const TextStyle(fontSize: 10, fontFamily: 'FiraCode', color: AppTheme.textSecondary),
                 ),
                 const SizedBox(width: 8),
@@ -182,13 +197,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
 
-            // Message Payload Content
-            Text(
-              bundle.payload,
-              style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
-            ),
+            // Render structured media payload
+            _buildMediaContent(media),
+
             const SizedBox(height: 8),
 
             // Hop count & TTL Footer
@@ -211,6 +224,178 @@ class _ChatScreenState extends State<ChatScreen> {
                 const Spacer(),
                 const Icon(LucideIcons.checkCheck, size: 14, color: AppTheme.success),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaContent(MediaPayload media) {
+    switch (media.type) {
+      case MediaPayloadType.voiceNote:
+        return Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppTheme.background,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(LucideIcons.mic, color: AppTheme.primary, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Voice Note (${media.audioDurationSec ?? 4}s)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Text('||||||||||||||||||||||||||||||', style: TextStyle(fontSize: 10, color: AppTheme.primary, letterSpacing: 2)),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(LucideIcons.play, size: 16, color: AppTheme.primary),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Playing simulated DTN voice note...')),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+
+      case MediaPayloadType.geoMarker:
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: (media.emergencySeverity == 3) ? AppTheme.error.withOpacity(0.15) : AppTheme.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: (media.emergencySeverity == 3) ? AppTheme.error : AppTheme.secondary,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(LucideIcons.mapPin, color: (media.emergencySeverity == 3) ? AppTheme.error : AppTheme.secondary, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    media.emergencySeverity == 3 ? '🚨 CRITICAL SOS GEO-MARKER' : 'Tactical Geo-Marker',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: (media.emergencySeverity == 3) ? AppTheme.error : AppTheme.secondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(media.textContent, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(
+                'Coordinates: ${media.latitude?.toStringAsFixed(5)}, ${media.longitude?.toStringAsFixed(5)} (${media.altitudeMeters?.toStringAsFixed(0)}m alt)',
+                style: const TextStyle(fontSize: 11, fontFamily: 'FiraCode', color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        );
+
+      case MediaPayloadType.image:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(LucideIcons.image, size: 36, color: AppTheme.primary),
+                    SizedBox(height: 4),
+                    Text('DTN Image Fragment (Reassembled)', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(media.textContent, style: const TextStyle(fontSize: 13)),
+          ],
+        );
+
+      case MediaPayloadType.text:
+      default:
+        return Text(
+          media.textContent,
+          style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+        );
+    }
+  }
+
+  void _showAttachmentSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Attach Rich DTN Media', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppTheme.error, child: Icon(LucideIcons.alertTriangle, color: Colors.white, size: 18)),
+              title: const Text('Send Emergency SOS Geo-Marker'),
+              subtitle: const Text('Attach current GPS coordinates + High Priority flag'),
+              onTap: () {
+                Navigator.pop(context);
+                final geoPayload = MediaPayload.geoMarker(
+                  lat: 26.8467,
+                  lon: 80.9462,
+                  alt: 123.0,
+                  label: 'Need medical relief at Grid Ref #Alpha-04',
+                  emergencySeverity: 3,
+                );
+                widget.onSendMessage(geoPayload.serialize(), BundlePriority.high);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppTheme.primary, child: Icon(LucideIcons.mic, color: Colors.black, size: 18)),
+              title: const Text('Record Voice Note (Opus Compressed)'),
+              subtitle: const Text('Simulate 5s compressed audio bundle'),
+              onTap: () {
+                Navigator.pop(context);
+                final voicePayload = MediaPayload.voiceNote(
+                  durationSec: 5,
+                  audioBase64: 'mock_audio_opus_wave_data',
+                  label: 'Field audio report from Sector 3',
+                );
+                widget.onSendMessage(voicePayload.serialize(), BundlePriority.normal);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppTheme.secondary, child: Icon(LucideIcons.image, color: Colors.white, size: 18)),
+              title: const Text('Attach Recon Photo (Slices into RFC 9171 Fragments)'),
+              subtitle: const Text('Simulate multi-fragment image transfer'),
+              onTap: () {
+                Navigator.pop(context);
+                final imagePayload = MediaPayload.image(
+                  imageBase64: 'mock_image_jpeg_data',
+                  width: 800,
+                  height: 600,
+                  caption: 'Obstacle blocking main transit route',
+                );
+                widget.onSendMessage(imagePayload.serialize(), BundlePriority.normal);
+              },
             ),
           ],
         ),
