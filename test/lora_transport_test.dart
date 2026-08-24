@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mesh_messenger/core/models/bundle.dart';
 import 'package:mesh_messenger/transports/lora_transport.dart';
@@ -51,12 +52,13 @@ void main() {
         signature: 'sig_relay',
       );
 
-      expectLater(
+      final expectation = expectLater(
         lora.incomingBundles,
         emits(predicate<Bundle>((b) => b.bundleId == 'bundle_lora_rx_02')),
       );
 
-      lora.injectIncomingRawLoraPacket(incoming.toJson().toString().replaceAll("'", '"'));
+      lora.injectIncomingRawLoraPacket(jsonEncode(incoming.toJson()));
+      await expectation;
     });
   });
 }
