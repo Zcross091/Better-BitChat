@@ -72,6 +72,17 @@ class ProphetRouter {
     return Map.unmodifiable(_predictabilityScores);
   }
 
+  /// Alias returning full map of peer delivery predictabilities
+  Map<String, double> getAllPredictabilities() {
+    return getPredictabilityMap();
+  }
+
+  /// Resets encounter and predictability history (for panic wipe)
+  void reset() {
+    _predictabilityScores.clear();
+    _lastEncounterTimes.clear();
+  }
+
   void _decayScores(String nodeKey) {
     final lastTime = _lastEncounterTimes[nodeKey];
     if (lastTime == null) return;

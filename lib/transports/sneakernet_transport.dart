@@ -44,6 +44,11 @@ class SneakernetTransport implements TransportDriver {
     }
   }
 
+  /// Alias for injecting scanned QR bundle payload
+  bool injectScannedQrBundle(String rawPayload) {
+    return importScannedQrPayload(rawPayload);
+  }
+
   @override
   Future<void> startDiscovery() async {}
 

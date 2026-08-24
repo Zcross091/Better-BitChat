@@ -63,6 +63,18 @@ class TransportManager {
     }
   }
 
+  Future<void> startDiscovery() async {
+    for (final driver in _drivers) {
+      await driver.startDiscovery();
+    }
+  }
+
+  Future<void> stopDiscovery() async {
+    for (final driver in _drivers) {
+      await driver.stopDiscovery();
+    }
+  }
+
   /// Broadcasts bundle over all active transport drivers simultaneously (multi-path send)
   Future<int> broadcastBundle(Bundle bundle) async {
     int successCount = 0;

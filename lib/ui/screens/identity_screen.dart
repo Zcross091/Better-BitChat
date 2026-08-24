@@ -144,7 +144,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Allows $O(1)$ multi-party group broadcasting with forward secrecy. When sending to #rescue-team, all members decrypt with their shared ratchet state:',
+                    'Allows O(1) multi-party group broadcasting with forward secrecy. When sending to #rescue-team, all members decrypt with their shared ratchet state:',
                     style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 10),
