@@ -3,7 +3,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/routing/prophet_router.dart';
 import '../../core/storage/persistent_bundle_store.dart';
 import '../../transports/transport_manager.dart';
+import '../../transports/usb_serial_lora_transport.dart';
 import '../theme/app_theme.dart';
+import '../widgets/hardware_console_dialog.dart';
 
 class NetworkScreen extends StatelessWidget {
   final TransportManager transportManager;
@@ -21,6 +23,7 @@ class NetworkScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final activePeers = transportManager.activePeers;
     final allPredictabilities = prophetRouter.getAllPredictabilities();
+    final usbTransport = transportManager.getDriver<UsbSerialLoraTransport>();
 
     return Scaffold(
       appBar: AppBar(
@@ -32,7 +35,7 @@ class NetworkScreen extends StatelessWidget {
             onPressed: () {
               transportManager.startDiscovery();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Re-scanning BLE, LoRa, and WiFi Direct radios...')),
+                const SnackBar(content: Text('Re-scanning BLE, LoRa, USB-Serial, and WiFi Direct radios...')),
               );
             },
           ),
@@ -87,6 +90,77 @@ class NetworkScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // Physical Hardware Bridge Card
+          Card(
+            color: AppTheme.primary.withOpacity(0.08),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: AppTheme.primary.withOpacity(0.4)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(LucideIcons.cpu, color: AppTheme.primary),
+                          SizedBox(width: 8),
+                          Text('USB-OTG & Serial LoRa Bridge', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (usbTransport?.isConnected ?? false) ? AppTheme.success.withOpacity(0.2) : AppTheme.error.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          (usbTransport?.isConnected ?? false) ? 'UART 115200 8N1' : 'DISCONNECTED',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: (usbTransport?.isConnected ?? false) ? AppTheme.success : AppTheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Direct physical connection to Heltec WiFi LoRa 32 / T-Beam ESP32 companion radios with binary Meshtastic packet interop:',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.black,
+                        ),
+                        icon: const Icon(LucideIcons.terminal, size: 14),
+                        label: const Text('Open Live UART Console'),
+                        onPressed: () {
+                          if (usbTransport != null) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => HardwareConsoleDialog(transport: usbTransport),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Active Transports Grid
           const Text('ACTIVE MULTI-TRANSPORT DRIVERS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
           const SizedBox(height: 8),
@@ -101,7 +175,16 @@ class NetworkScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           _buildTransportCard(
-            title: 'LoRa 915 MHz Companion Radio',
+            title: 'USB-OTG Serial LoRa Companion',
+            subtitle: 'Hardware bridge (CP2102/CH340/FTDI) @ 115200 baud',
+            icon: LucideIcons.usb,
+            statusColor: AppTheme.primary,
+            statusText: 'HARDWARE ACTIVE',
+          ),
+          const SizedBox(height: 8),
+
+          _buildTransportCard(
+            title: 'LoRa 915 MHz RF Radio (SX1262)',
             subtitle: 'SX1262 SPI module @ SF9 | BW 250kHz | RSSI: -94 dBm (2-15km)',
             icon: LucideIcons.radio,
             statusColor: AppTheme.primary,

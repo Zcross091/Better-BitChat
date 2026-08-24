@@ -2,7 +2,7 @@ import 'dart:async';
 import '../core/models/bundle.dart';
 import '../core/storage/bundle_store.dart';
 
-enum TransportType { ble, wifiDirect, nostrGateway, sneakernet, simulator, lora }
+enum TransportType { ble, wifiDirect, nostrGateway, sneakernet, simulator, lora, usbSerialLora }
 
 abstract class TransportDriver {
   String get name;
@@ -54,6 +54,13 @@ class TransportManager {
     driver.incomingBundles.listen((bundle) {
       _bundleStreamController.add(bundle);
     });
+  }
+
+  T? getDriver<T extends TransportDriver>() {
+    for (final d in _drivers) {
+      if (d is T) return d;
+    }
+    return null;
   }
 
   Future<void> initializeAll() async {

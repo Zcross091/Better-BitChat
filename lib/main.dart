@@ -12,6 +12,7 @@ import 'transports/nostr_gateway_transport.dart';
 import 'transports/simulator_transport.dart';
 import 'transports/sneakernet_transport.dart';
 import 'transports/transport_manager.dart';
+import 'transports/usb_serial_lora_transport.dart';
 import 'transports/wifi_direct_transport.dart';
 import 'ui/screens/chat_screen.dart';
 import 'ui/screens/identity_screen.dart';
@@ -54,6 +55,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   late final BleTransport _bleTransport;
   late final LoraTransport _loraTransport;
+  late final UsbSerialLoraTransport _usbSerialTransport;
   late final WifiDirectTransport _wifiDirectTransport;
   late final NostrGatewayTransport _nostrTransport;
   late final SneakernetTransport _sneakernetTransport;
@@ -78,6 +80,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     // 3. Initialize transport drivers
     _bleTransport = BleTransport();
     _loraTransport = LoraTransport();
+    _usbSerialTransport = UsbSerialLoraTransport();
     _wifiDirectTransport = WifiDirectTransport();
     _nostrTransport = NostrGatewayTransport();
     _sneakernetTransport = SneakernetTransport();
@@ -85,6 +88,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     _transportManager.registerDriver(_bleTransport);
     _transportManager.registerDriver(_loraTransport);
+    _transportManager.registerDriver(_usbSerialTransport);
     _transportManager.registerDriver(_wifiDirectTransport);
     _transportManager.registerDriver(_nostrTransport);
     _transportManager.registerDriver(_sneakernetTransport);
@@ -104,7 +108,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     // 5. Seed initial welcome DTN bundles if empty
     if (_bundleStore.count == 0) {
       final welcomePayload = MediaPayload.text(
-        'Welcome to Mesh Messenger DTN! Offline-first resilient messaging across BLE, LoRa, WiFi Direct, and Nostr.',
+        'Welcome to Mesh Messenger DTN! Offline-first resilient messaging across BLE, LoRa, USB-Serial, WiFi Direct, and Nostr.',
       );
       final initialBundle = Bundle(
         bundleId: Bundle.generateBundleId(
@@ -158,7 +162,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   void _handleSendMessage(String text, BundlePriority priority) async {
     final senderPub = _myKeyPair?.publicKeyHex ?? 'pub_alice_ed25519_01';
-    final senderPriv = _myKeyPair?.privateKeyHex ?? 'priv_alice_key';
 
     final bundleId = Bundle.generateBundleId(
       senderPubkey: senderPub,
