@@ -1,0 +1,43 @@
+name: Update Daily Quote
+
+on:
+  schedule:
+    # Runs every 20 hours: 00:00, 20:00, 16:00 (next day), etc.
+    - cron: '0 */20 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  update-quote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch quote and overwrite text.txt
+        run: |
+          # Fetch a random quote from ZenQuotes API
+          QUOTE_JSON=$(curl -s "https://zenquotes.io/api/random")
+          
+          # Extract quote text and author using jq
+          QUOTE=$(echo "$QUOTE_JSON" | jq -r '.[0].q')
+          AUTHOR=$(echo "$QUOTE_JSON" | jq -r '.[0].a')
+
+          # Check for text.tx5 or text.txt, then truncate and overwrite
+          if [ -f "text.tx5" ]; then
+            TARGET_FILE="text.tx5"
+          else
+            TARGET_FILE="text.txt"
+          fi
+
+          # Single '>' creates the file if missing, or empties it if it exists
+          echo "\"$QUOTE\" — $AUTHOR" > "$TARGET_FILE"
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add text.txt text.tx5 2>/dev/null || true
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update quote of the day" && git push)
